@@ -11,7 +11,7 @@ type ImageMeta = {
   type: "png" | "jpg" | "gif" | "bmp";
 };
 
-function detectImageType(src: string, bytes: Uint8Array): ImageMeta["type"] {
+export function detectImageType(src: string, bytes: Uint8Array): ImageMeta["type"] {
   if (bytes[0] === 0x89 && bytes[1] === 0x50) return "png";
   if (bytes[0] === 0xff && bytes[1] === 0xd8) return "jpg";
   if (bytes[0] === 0x47 && bytes[1] === 0x49) return "gif";

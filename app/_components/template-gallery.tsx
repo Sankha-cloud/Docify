@@ -8,21 +8,10 @@ import { Id } from "@/convex/_generated/dataModel";
 import { FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errors";
-import type { TiptapNode } from "@/lib/export/types";
-
-function extractTopNodes(content: string): TiptapNode[] {
-  try {
-    const parsed = JSON.parse(content) as { content?: TiptapNode[] };
-    return parsed.content ?? [];
-  } catch {
-    return [];
-  }
-}
-
-function nodeText(node: TiptapNode): string {
-  if (node.text) return node.text;
-  return (node.content ?? []).map(nodeText).join("");
-}
+import {
+  extractTopNodes,
+  nodeText,
+} from "./template-preview-helpers";
 
 function TemplatePreview({ content }: { content: string }) {
   const nodes = extractTopNodes(content).slice(0, 8);

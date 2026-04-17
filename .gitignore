@@ -12,6 +12,13 @@
 
 # ─── testing ─────────────────────────────────────────────────────
 /coverage
+/playwright-report/
+/test-results/
+/playwright/.cache/
+# Persisted Clerk storage state for E2E — contains signed-in session
+# cookies; must never be committed even though paths under /.auth/ look
+# harmless.
+/.auth/
 
 # ─── next.js ─────────────────────────────────────────────────────
 /.next/

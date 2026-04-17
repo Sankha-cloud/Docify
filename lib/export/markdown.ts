@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { downloadBlob, sanitizeFilename } from "./common";
 import type { TiptapNode } from "./types";
 
-function nodeToMarkdown(node: TiptapNode, listDepth = 0): string {
+export function nodeToMarkdown(node: TiptapNode, listDepth = 0): string {
   const children = (node.content ?? [])
     .map((n) => nodeToMarkdown(n, listDepth))
     .join("");
