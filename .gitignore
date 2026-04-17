@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# ─── dependencies ────────────────────────────────────────────────
 /node_modules
 /.pnp
 .pnp.*
@@ -10,51 +10,65 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# ─── testing ─────────────────────────────────────────────────────
 /coverage
 
-# next.js
+# ─── next.js ─────────────────────────────────────────────────────
 /.next/
 /out/
 
-# production
+# ─── production build ────────────────────────────────────────────
 /build
+/dist
 
-# misc
+# ─── typescript ──────────────────────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
+
+# ─── env / secrets ───────────────────────────────────────────────
+# Never commit any environment file. Use .env.example (committed) for docs.
+.env
+.env.*
+!.env.example
+
+# ─── vercel / deploy ─────────────────────────────────────────────
+.vercel
+
+# ─── convex (local dev state) ────────────────────────────────────
+.convex/
+
+# ─── turbopack / next cache variants ─────────────────────────────
+.turbo/
+.swc/
+
+# ─── claude code (per-developer local state) ─────────────────────
+.claude/settings.local.json
+.claude/state/
+.claude/cache/
+
+# ─── editor / IDE ────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ─── OS noise ───────────────────────────────────────────────────
 .DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
 *.pem
 
-# debug
+# ─── logs ────────────────────────────────────────────────────────
+*.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# claude code (per-developer local state — machine-specific permission list)
-.claude/settings.local.json
-
-# convex local dev state
-.convex/
-
-# turbopack / next cache variants
-.turbo/
-
-# editor / OS noise
-.vscode/
-.idea/
-Thumbs.db
-
-# logs
-*.log
-logs/
-
+# ─── misc ────────────────────────────────────────────────────────
+*.local
+tmp/

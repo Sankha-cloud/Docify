@@ -1,8 +1,8 @@
 # DocFlow — Product Requirements Document
-**Version:** 2.2 (implementation pass)
+**Version:** 2.3 (polish pass)
 **Author:** Sankha
 **Date:** April 14, 2026 · last update 2026-04-17
-**Status:** 🟢 Core v1 implemented — pending production deploy and a few behavioral polish items
+**Status:** 🟢 Core v1 implemented + UX polish pass complete — pending production deploy
 
 > **How to use this PRD:**
 > Feed each Phase section to Cursor/Claude Code one at a time.
@@ -22,11 +22,24 @@ Legend: ✅ done · 🟡 partial / deviated · ⏸️ deferred to v1.1 · ❌ no
 | 2 | Convex schema + all functions | ✅ | `documents`, `documentAccess`, `templates` tables + 12 queries/mutations. Access keyed by `email` (see 4.1). |
 | 3 | Auth pages | ✅ | `/sign-in`, `/sign-up` catch-all routes wrapped in Suspense for `cacheComponents`. |
 | 4 | Home Screen | ✅ | Navbar + template gallery + document list with filter/search/three-dot menu + rename + empty state. |
-| 5 | Document Editor (single-user) | ✅ | Auto-save 500ms, title sync to tab, File/Edit/Insert/Format menus, full toolbar, font-size via TextStyleKit `setFontSize`. |
-| 6 | Export (PDF, DOCX, MD, TXT) | ✅ | PDF via html2canvas+jsPDF; DOCX via docx.js walker; MD via custom Tiptap→Markdown serializer; TXT via `editor.getText()`. |
-| 7 | Real-Time Collaboration | ✅ | `/api/liveblocks-auth` verifies Convex access per request; `useLiveblocksExtension` drives Yjs + cursors; `AvatarStack` via `useOthers()`. |
+| 5 | Document Editor (single-user) | ✅ | Auto-save 500 ms, title sync to tab, File/Edit/Insert/Format menus, full toolbar, font-size via TextStyleKit `setFontSize`. Google-Docs-style A4 page layout + page indicator (see polish pass below). |
+| 6 | Export (PDF, DOCX, MD, TXT) | ✅ | PDF via html2canvas+jsPDF with oklch/lab colour-function shim (see polish pass); DOCX via docx.js walker; MD via custom Tiptap→Markdown serializer; TXT via `editor.getText()`. |
+| 7 | Real-Time Collaboration | ✅ | `/api/liveblocks-auth` verifies Convex access per request; `useLiveblocksExtension` drives Yjs + cursors; `AvatarStack` via `useOthers()`. Google-Docs-style thin caret + floating name label (see polish pass). |
 | 8 | Sharing & Access Enforcement | ✅ | Share dialog (invite/role/remove/copy-link). Three-layer enforcement: `documents.getById` → editor `isEditable` → Liveblocks auth token scope (`FULL_ACCESS` vs `READ_ACCESS`). |
-| 9 | Polish | 🟡 | Skeletons, error boundary, toasts, responsive warning banner done. Vercel production deploy + `npx convex deploy` not done yet. |
+| 9 | Polish | 🟡 | Skeletons, error boundary, toasts, responsive warning banner done. UX polish pass complete. Vercel production deploy + `npx convex deploy` not done yet. |
+
+### Polish Pass (2026-04-17)
+
+Completed in a single session against the live app:
+
+- **Google-Docs-style page layout** — the ProseMirror root is styled as a single A4 page (794 × 1123 px at 96 dpi) with 1-inch margins on a light blue-gray desktop (`bg-[#eef1f5]`). Simulated page breaks are painted via a 1133-px-cycle `repeating-linear-gradient` (1123 px white page → 1 px divider → 8 px gap → 1 px divider). No per-page DOM nodes (deferred to v1.1).
+- **Floating page indicator** — `page-indicator.tsx` shows `Page X of Y` in a fixed pill, bottom-right. Listens to the `[data-tiptap-root]` scroller (auto-falls-back to `window`) and uses `getBoundingClientRect()` + a `ResizeObserver` on `.ProseMirror` so it works regardless of which element actually scrolls.
+- **Layout: `<main>` as scroll container** — `EditorUI` return is now wrapped in `<div className="flex h-screen flex-col">`. Previously `body` was `min-h-full`, which let the document grow past the viewport and made the window scroll — so the `data-tiptap-root` scroll listener never fired.
+- **`DropdownMenuItem` `onSelect` adapter** — Base UI's `Menu.Item` doesn't support `onSelect` (that's Radix-only). Adapter in `components/ui/dropdown-menu.tsx` forwards `onSelect` to `onClick` so the whole codebase keeps the Radix-style API.
+- **Edit menu** — Cut / Copy are now disabled when the selection is empty (tracked via `useEditorState`). Paste uses `navigator.clipboard.readText()` with a toast fallback (the direct `document.execCommand("paste")` is blocked in modern browsers).
+- **Google-Docs-style link popover** — new `link-popover.tsx` with display-text + URL inputs, existing-URL preview with Remove, and an Apply button. Reused by both the toolbar link button and the Insert → Link menu item; the menu item version renders a hidden `sr-only` anchor and is driven programmatically. Link application uses `setTextSelection(sel).insertContent({…marks:[{type:"link"}]})` — the naïve `deleteRange + insertContentAt` threw ProseMirror's `TransformError: Inserted content deeper than insertion position` when the deletion landed on a block boundary.
+- **PDF export — `oklch` / `lab` colour-function shim** — html2canvas can't parse modern CSS colour functions, which Tailwind v4's theme variables (and Liveblocks' selection CSS) use heavily. `lib/export.ts` now: (1) walks every `cssRule.cssText` to collect every unique `oklch|oklab|lab|lch(...)` string, (2) resolves each to `rgb()` via a hidden probe element + `getComputedStyle`, (3) in html2canvas's `onclone`, replaces those literal strings inside every `<style>` element. Earlier attempt only patched `--` custom properties and missed direct-value usage.
+- **Liveblocks cursor styling** — imported `@liveblocks/react-tiptap/styles.css` (previously missing; the default look was a solid blue selection block). Added Google-Docs-style caret + floating name label with a fade-out animation and a 0.35-opacity selection override in `editor-styles.css`.
 
 ### Deviations from the original spec
 - **Tiptap v3**, not v2 (current stable release; adapter APIs differ slightly — StarterKit now includes `Link` + `Underline`, history renamed to `undoRedo`, `FontSize` lives in `@tiptap/extension-text-style`).
@@ -34,8 +47,10 @@ Legend: ✅ done · 🟡 partial / deviated · ⏸️ deferred to v1.1 · ❌ no
 - **Markdown export** uses a hand-rolled Tiptap JSON → Markdown walker in `lib/export.ts`. The `@tiptap/extension-markdown` package referenced in Phase 1 does not exist in v3.
 - **Liveblocks auth** moved to `convex/react-clerk` + `ConvexHttpClient` at the edge — see `app/api/liveblocks-auth/route.ts`.
 - **`cacheComponents: true` + React Compiler** enabled in `next.config.ts`. Pages that use `auth()` are wrapped in `<Suspense>` to satisfy the Cache Components constraint that runtime data must live under a Suspense boundary.
+- **UI primitives are Base UI (`@base-ui/react`), not Radix** — shadcn "base-nova" style. This means `Menu.Item` uses `onClick` rather than `onSelect`; the adapter in `components/ui/dropdown-menu.tsx` preserves the Radix-style call-site API.
 
 ### Deferred to v1.1 (tracked, not blocking)
+- ⏸️ **True pagination** — current A4 layout is visual-only via a repeating gradient; a real paginated editor (separate page DOM nodes with individual shadows, per-page headers/footers, page-break-controlled content flow) is a v1.1 item.
 - ⏸️ **Find & Replace** floating panel (Section 8.4). Browser `Ctrl+F` still works.
 - ⏸️ **Email delivery** on invite (Section 10 already lists this as a Non-Goal; called out for clarity).
 - ⏸️ **Production deploy** to Vercel + `npx convex deploy` (Phase 9, last two bullets).
@@ -826,4 +841,4 @@ This project uses Next.js 16.2. Key differences from Next.js 15:
 6. React version is 19.2 — View Transitions and useEffectEvent are available if needed.
 ```
 
-*End of DocFlow PRD v2.1*
+*End of DocFlow PRD v2.3*

@@ -8,12 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
   Bold,
@@ -36,7 +30,8 @@ import {
   Minus,
   Plus,
 } from "lucide-react";
-import { useRef, useState, ComponentProps } from "react";
+import { useState, ComponentProps } from "react";
+import { LinkPopover } from "./link-popover";
 
 type Props = {
   editor: Editor;
@@ -81,10 +76,6 @@ function ToolbarBtn({ active, onMouseDown, ...props }: TBProps) {
 }
 
 export function Toolbar({ editor, zoom, onZoomChange }: Props) {
-  const [linkUrl, setLinkUrl] = useState("");
-  const [linkOpen, setLinkOpen] = useState(false);
-  const savedSelection = useRef<{ from: number; to: number } | null>(null);
-
   // Subscribe to the editor's state so the toolbar re-renders on every
   // transaction (typing, selection change, stored-mark changes, etc.).
   const state = useEditorState({
@@ -131,38 +122,6 @@ export function Toolbar({ editor, zoom, onZoomChange }: Props) {
     // storedMarks before setMark adds them. setMark already routes via the
     // editor's dispatch, so the command still applies.
     editor.chain().setFontSize(`${clamped}px`).run();
-  };
-
-  const openLinkPopover = (open: boolean) => {
-    if (open) {
-      const { from, to } = editor.state.selection;
-      savedSelection.current = { from, to };
-      const current = editor.getAttributes("link").href as string | undefined;
-      setLinkUrl(current ?? "");
-    }
-    setLinkOpen(open);
-  };
-
-  const applyLink = () => {
-    const raw = linkUrl.trim();
-    if (!raw) return;
-    const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    const chain = editor.chain().focus();
-    if (savedSelection.current) {
-      chain.setTextSelection(savedSelection.current);
-    }
-    chain.extendMarkRange("link").setLink({ href }).run();
-    setLinkOpen(false);
-    setLinkUrl("");
-  };
-
-  const removeLink = () => {
-    const chain = editor.chain().focus();
-    if (savedSelection.current) {
-      chain.setTextSelection(savedSelection.current);
-    }
-    chain.extendMarkRange("link").unsetLink().run();
-    setLinkOpen(false);
   };
 
   const addImage = () => {
@@ -303,49 +262,13 @@ export function Toolbar({ editor, zoom, onZoomChange }: Props) {
         <Strikethrough className="size-4" />
       </ToolbarBtn>
 
-      <Popover open={linkOpen} onOpenChange={openLinkPopover}>
-        <PopoverTrigger
-          onMouseDown={preserveFocus}
-          render={
-            <Button
-              variant={state?.isLink ? "secondary" : "ghost"}
-              size="icon-sm"
-              aria-label="Insert link"
-            />
-          }
-        >
-          <LinkIcon className="size-4" />
-        </PopoverTrigger>
-        <PopoverContent className="w-72">
-          <div className="flex items-center gap-2">
-            <Input
-              autoFocus
-              placeholder="https://example.com"
-              value={linkUrl}
-              onChange={(e) => setLinkUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  applyLink();
-                }
-              }}
-            />
-            <Button size="sm" onClick={applyLink}>
-              Apply
-            </Button>
-          </div>
-          {state?.isLink && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-2"
-              onClick={removeLink}
-            >
-              Remove link
-            </Button>
-          )}
-        </PopoverContent>
-      </Popover>
+      <LinkPopover
+        editor={editor}
+        isActive={state?.isLink}
+        onMouseDown={preserveFocus}
+      >
+        <LinkIcon className="size-4" />
+      </LinkPopover>
 
       <ToolbarBtn aria-label="Insert image" onClick={addImage}>
         <ImageIcon className="size-4" />

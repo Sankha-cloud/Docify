@@ -1,3 +1,44 @@
+/* ─── Google-Docs-style A4 page layout ─── */
+
+/*
+  A4 at 96 dpi: 210mm × 297mm → 794px × 1123px
+  Pages are centered on a light blue-gray desktop (#eef1f5).
+  A thin 1px border line + 8px gap separates each page.
+  Cycle = 1123px (page) + 1px (bottom border) + 8px (gap) + 1px (top border) = 1133px.
+  True pagination (separate DOM nodes) is deferred to v1.1.
+*/
+.docflow-page {
+  /* A4 dimensions */
+  width: 794px;
+  min-height: 1123px;
+  /* 1-inch (96px) margins on all sides */
+  padding: 96px;
+  /* Page appearance */
+  margin: 0 auto;
+  outline: none;
+  line-height: 1.6;
+  color: #1a1a1a;
+
+  /*
+    Cycle breakdown (1133px total):
+      0 – 1123px : white page content
+      1123 – 1124px : 1px bottom border (#c5ccd8)
+      1124 – 1132px : 8px gap (#eef1f5, matches desktop)
+      1132 – 1133px : 1px top border of next page (#c5ccd8)
+  */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    #ffffff    0px,
+    #ffffff    1123px,
+    #c5ccd8    1123px,
+    #c5ccd8    1124px,
+    #eef1f5    1124px,
+    #eef1f5    1132px,
+    #c5ccd8    1132px,
+    #c5ccd8    1133px
+  );
+}
+
 .ProseMirror {
   outline: none;
   line-height: 1.6;
@@ -102,27 +143,55 @@
   text-align: left;
 }
 
-.ProseMirror .collaboration-cursor__caret {
-  border-left: 1px solid;
-  border-right: 1px solid;
-  margin-left: -1px;
-  margin-right: -1px;
-  pointer-events: none;
+/* ─── Collaborative cursors — Google Docs style ─── */
+
+/* Thin colored cursor line. Liveblocks sets border-color via inline style. */
+.ProseMirror .collaboration-cursor__caret,
+.ProseMirror .collaboration-carets__caret {
   position: relative;
+  margin-inline: -1px;
+  border-inline-start: 2px solid;
+  border-inline-end: none;
+  pointer-events: none;
   word-break: normal;
 }
 
-.ProseMirror .collaboration-cursor__label {
-  border-radius: 3px 3px 3px 0;
-  color: white;
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 600;
-  left: -1px;
-  line-height: normal;
-  padding: 0.1rem 0.3rem;
+/* Floating name label above the caret */
+.ProseMirror .collaboration-cursor__label,
+.ProseMirror .collaboration-carets__label {
   position: absolute;
-  top: -1.2em;
-  user-select: none;
+  left: -2px;
+  top: -1.65em;
+  padding: 2px 8px;
+  border-radius: 3px 3px 3px 0;
+  font-size: 11px;
+  font-weight: 600;
+  font-style: normal;
+  line-height: 1.4;
   white-space: nowrap;
+  color: #fff;
+  pointer-events: none;
+  user-select: none;
+  /* Fade out after a moment so it doesn't obscure text permanently */
+  opacity: 1;
+  animation: cursor-label-fade 4s ease forwards;
+}
+
+/* Reveal label again on hover */
+.ProseMirror .collaboration-cursor__caret:hover .collaboration-cursor__label,
+.ProseMirror .collaboration-carets__caret:hover .collaboration-carets__label {
+  opacity: 1;
+  animation: none;
+}
+
+@keyframes cursor-label-fade {
+  0%,
+  60% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Selection highlight — override Liveblocks default to stay semi-transparent */
+.lb-tiptap-active-selection {
+  opacity: 0.35 !important;
+  pointer-events: none;
 }

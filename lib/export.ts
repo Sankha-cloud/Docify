@@ -113,6 +113,54 @@ export function downloadMarkdown(editor: Editor, title: string) {
   toast.success("Downloaded .md");
 }
 
+// html2canvas can't parse modern CSS color functions (oklch, oklab, lab, lch).
+// Walk every stylesheet rule, collect every unique color-function string, resolve
+// each to rgb() via a probe element, then swap them out in the cloned document's
+// <style> elements before html2canvas sees them.
+// This handles BOTH CSS custom properties (--var: oklch(...)) AND regular
+// properties (color: lab(...)) in any third-party stylesheet (e.g. Liveblocks).
+function buildColorReplacements(): Map<string, string> {
+  const COLOR_FN = /(?:oklch|oklab|lab|lch)\([^)]+\)/gi;
+  const found = new Set<string>();
+
+  const collectFromRules = (rules: CSSRuleList) => {
+    for (const rule of Array.from(rules)) {
+      if ("cssRules" in rule) {
+        collectFromRules((rule as CSSGroupingRule).cssRules);
+        continue;
+      }
+      // rule.cssText gives the full serialized text including all properties
+      const matches = rule.cssText.match(COLOR_FN);
+      if (matches) matches.forEach((m) => found.add(m));
+    }
+  };
+
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      collectFromRules(sheet.cssRules);
+    } catch {
+      // skip cross-origin stylesheets
+    }
+  }
+
+  if (found.size === 0) return new Map();
+
+  // Resolve each color-function string to rgb() via the browser
+  const probe = document.createElement("span");
+  probe.style.display = "none";
+  document.body.appendChild(probe);
+
+  const map = new Map<string, string>();
+  for (const fn of found) {
+    probe.style.color = fn;
+    const rgb = window.getComputedStyle(probe).color;
+    if (rgb) map.set(fn, rgb);
+  }
+
+  document.body.removeChild(probe);
+  return map;
+}
+
 export async function downloadPdf(editor: Editor, title: string) {
   const t = toast.loading("Preparing PDF...");
   try {
@@ -126,7 +174,30 @@ export async function downloadPdf(editor: Editor, title: string) {
     ) as HTMLElement | null;
     if (!el) throw new Error("Editor not found");
 
-    const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#fff" });
+    // Precompute replacements in original document context (probe needs live DOM)
+    const colorReplacements = buildColorReplacements();
+
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      backgroundColor: "#fff",
+      onclone: (clonedDoc: Document) => {
+        if (colorReplacements.size === 0) return;
+        // Replace every unsupported color function directly in the cloned
+        // document's <style> elements — covers both variables and plain props.
+        clonedDoc.querySelectorAll("style").forEach((styleEl) => {
+          let text = styleEl.textContent ?? "";
+          let dirty = false;
+          colorReplacements.forEach((rgb, fn) => {
+            if (text.includes(fn)) {
+              // replaceAll is safe here: fn is a literal string, not a regex
+              text = text.split(fn).join(rgb);
+              dirty = true;
+            }
+          });
+          if (dirty) styleEl.textContent = text;
+        });
+      },
+    });
     const imgData = canvas.toDataURL("image/png");
     const pdf = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = pdf.internal.pageSize.getWidth();

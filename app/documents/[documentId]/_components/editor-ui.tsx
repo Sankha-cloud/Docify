@@ -1,5 +1,6 @@
 "use client";
 
+import "@liveblocks/react-tiptap/styles.css";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useLiveblocksExtension } from "@liveblocks/react-tiptap";
@@ -27,6 +28,7 @@ import { SaveStatusBadge, SaveStatus } from "./save-status";
 import { AvatarStack } from "./avatar-stack";
 import { DesktopWarning } from "./desktop-warning";
 import { ShareDialog } from "@/app/_components/share-dialog";
+import { PageIndicator } from "./page-indicator";
 
 type Props = {
   documentId: Id<"documents">;
@@ -81,8 +83,7 @@ export function EditorUI({ documentId, doc, isOwner, isEditable }: Props) {
     ],
     editorProps: {
       attributes: {
-        class:
-          "prose prose-neutral max-w-none min-h-[80vh] p-16 bg-white shadow-sm rounded-sm focus:outline-none",
+        class: "docflow-page prose prose-neutral focus:outline-none",
       },
     },
     onUpdate: ({ editor }) => {
@@ -119,7 +120,7 @@ export function EditorUI({ documentId, doc, isOwner, isEditable }: Props) {
   }
 
   return (
-    <>
+    <div className="flex h-screen flex-col">
       <header className="sticky top-0 z-30 border-b bg-background">
         <DesktopWarning />
         <div className="flex h-14 items-center gap-3 px-4">
@@ -152,21 +153,23 @@ export function EditorUI({ documentId, doc, isOwner, isEditable }: Props) {
       </header>
 
       <main
-        className="flex-1 bg-muted/30 py-10"
+        className="flex-1 overflow-y-auto bg-[#eef1f5] py-8"
         data-tiptap-root
       >
         <div
-          className="mx-auto max-w-3xl origin-top"
-          style={{ transform: `scale(${zoom})` }}
+          className="origin-top"
+          style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
         >
           <EditorContent editor={editor} />
         </div>
       </main>
 
+      <PageIndicator />
+
       <ShareDialog
         documentId={shareOpen ? documentId : null}
         onOpenChange={(open) => setShareOpen(open)}
       />
-    </>
+    </div>
   );
 }

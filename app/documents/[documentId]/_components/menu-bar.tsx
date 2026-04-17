@@ -1,6 +1,6 @@
 "use client";
 
-import { Editor } from "@tiptap/react";
+import { Editor, useEditorState } from "@tiptap/react";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,7 @@ import {
 import { Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { RenameDialog } from "@/app/_components/rename-dialog";
+import { LinkPopover } from "./link-popover";
 import {
   downloadPlainText,
   downloadMarkdown,
@@ -47,6 +48,14 @@ export function MenuBar({
   const duplicate = useMutation(api.documents.duplicate);
   const softDelete = useMutation(api.documents.softDelete);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [insertLinkOpen, setInsertLinkOpen] = useState(false);
+
+  const { isSelectionEmpty } = useEditorState({
+    editor,
+    selector: ({ editor }) => ({
+      isSelectionEmpty: editor.state.selection.empty,
+    }),
+  });
 
   const handleNew = async () => {
     const id = await createDoc({});
@@ -147,22 +156,25 @@ export function MenuBar({
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onSelect={() => {
-                document.execCommand("cut");
-              }}
+              disabled={isSelectionEmpty}
+              onSelect={() => document.execCommand("cut")}
             >
               Cut
             </DropdownMenuItem>
             <DropdownMenuItem
-              onSelect={() => {
-                document.execCommand("copy");
-              }}
+              disabled={isSelectionEmpty}
+              onSelect={() => document.execCommand("copy")}
             >
               Copy
             </DropdownMenuItem>
             <DropdownMenuItem
-              onSelect={() => {
-                document.execCommand("paste");
+              onSelect={async () => {
+                try {
+                  const text = await navigator.clipboard.readText();
+                  editor.chain().focus().insertContent(text).run();
+                } catch {
+                  toast.info("Use Ctrl+V to paste");
+                }
               }}
             >
               Paste
@@ -185,60 +197,55 @@ export function MenuBar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger onMouseDown={(e) => e.preventDefault()} render={<Button variant="ghost" size="sm" />}>
-            Insert
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem
-              onSelect={() => {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.accept = "image/jpeg,image/png,image/gif,image/webp";
-                input.onchange = () => {
-                  const file = input.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const src = reader.result as string;
-                    editor.chain().focus().setImage({ src }).run();
+        <div className="relative">
+          <DropdownMenu>
+            <DropdownMenuTrigger onMouseDown={(e) => e.preventDefault()} render={<Button variant="ghost" size="sm" />}>
+              Insert
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onSelect={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/jpeg,image/png,image/gif,image/webp";
+                  input.onchange = () => {
+                    const file = input.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const src = reader.result as string;
+                      editor.chain().focus().setImage({ src }).run();
+                    };
+                    reader.readAsDataURL(file);
                   };
-                  reader.readAsDataURL(file);
-                };
-                input.click();
-              }}
-            >
-              Image
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() =>
-                editor
-                  .chain()
-                  .focus()
-                  .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-                  .run()
-              }
-            >
-              Table
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => {
-                const url = window.prompt("Enter URL (https://...)");
-                if (!url) return;
-                const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
-                editor
-                  .chain()
-                  .focus()
-                  .extendMarkRange("link")
-                  .setLink({ href })
-                  .run();
-              }}
-            >
-              Link
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>Chart (coming in v2)</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                  input.click();
+                }}
+              >
+                Image
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() =>
+                  editor
+                    .chain()
+                    .focus()
+                    .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+                    .run()
+                }
+              >
+                Table
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setInsertLinkOpen(true)}>
+                Link
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>Chart (coming in v2)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <LinkPopover
+            editor={editor}
+            open={insertLinkOpen}
+            onOpenChange={setInsertLinkOpen}
+          />
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger onMouseDown={(e) => e.preventDefault()} render={<Button variant="ghost" size="sm" />}>
