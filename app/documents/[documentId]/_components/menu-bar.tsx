@@ -1,0 +1,316 @@
+"use client";
+
+import { Editor } from "@tiptap/react";
+import { useState } from "react";
+import { useMutation } from "convex/react";
+import { useRouter } from "next/navigation";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Share2 } from "lucide-react";
+import { toast } from "sonner";
+import { RenameDialog } from "@/app/_components/rename-dialog";
+import {
+  downloadPlainText,
+  downloadMarkdown,
+  downloadDocx,
+  downloadPdf,
+} from "@/lib/export";
+
+type Props = {
+  editor: Editor;
+  documentId: Id<"documents">;
+  title: string;
+  isOwner: boolean;
+  onShareClick: () => void;
+};
+
+export function MenuBar({
+  editor,
+  documentId,
+  title,
+  isOwner,
+  onShareClick,
+}: Props) {
+  const router = useRouter();
+  const createDoc = useMutation(api.documents.create);
+  const duplicate = useMutation(api.documents.duplicate);
+  const softDelete = useMutation(api.documents.softDelete);
+  const [renameOpen, setRenameOpen] = useState(false);
+
+  const handleNew = async () => {
+    const id = await createDoc({});
+    window.open(`/documents/${id}`, "_blank");
+  };
+
+  const handleCopy = async () => {
+    const id = await duplicate({ documentId });
+    window.open(`/documents/${id}`, "_blank");
+  };
+
+  const handleTrash = async () => {
+    try {
+      await softDelete({ documentId });
+      toast.success("Moved to trash");
+      router.push("/");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Delete failed");
+    }
+  };
+
+  return (
+    <>
+      <div className="flex items-center gap-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger onMouseDown={(e) => e.preventDefault()} render={<Button variant="ghost" size="sm" />}>
+            File
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onSelect={handleNew}>
+              New document
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleCopy}>
+              Make a copy
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onShareClick} disabled={!isOwner}>
+              Share
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>Download</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem
+                  onSelect={() => downloadPdf(editor, title)}
+                >
+                  PDF (.pdf)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => downloadDocx(editor, title)}
+                >
+                  Word (.docx)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => downloadMarkdown(editor, title)}
+                >
+                  Markdown (.md)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => downloadPlainText(editor, title)}
+                >
+                  Plain text (.txt)
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuItem
+              onSelect={() => setRenameOpen(true)}
+              disabled={!isOwner}
+            >
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={handleTrash}
+              disabled={!isOwner}
+            >
+              Move to trash
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => window.print()}>
+              Print
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger onMouseDown={(e) => e.preventDefault()} render={<Button variant="ghost" size="sm" />}>
+            Edit
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().undo().run()}
+            >
+              Undo
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().redo().run()}
+            >
+              Redo
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => {
+                document.execCommand("cut");
+              }}
+            >
+              Cut
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                document.execCommand("copy");
+              }}
+            >
+              Copy
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                document.execCommand("paste");
+              }}
+            >
+              Paste
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() =>
+                editor.chain().focus().selectAll().run()
+              }
+            >
+              Select all
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                editor.chain().focus().deleteSelection().run()
+              }
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger onMouseDown={(e) => e.preventDefault()} render={<Button variant="ghost" size="sm" />}>
+            Insert
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem
+              onSelect={() => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = "image/jpeg,image/png,image/gif,image/webp";
+                input.onchange = () => {
+                  const file = input.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const src = reader.result as string;
+                    editor.chain().focus().setImage({ src }).run();
+                  };
+                  reader.readAsDataURL(file);
+                };
+                input.click();
+              }}
+            >
+              Image
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                editor
+                  .chain()
+                  .focus()
+                  .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+                  .run()
+              }
+            >
+              Table
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                const url = window.prompt("Enter URL (https://...)");
+                if (!url) return;
+                const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+                editor
+                  .chain()
+                  .focus()
+                  .extendMarkRange("link")
+                  .setLink({ href })
+                  .run();
+              }}
+            >
+              Link
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled>Chart (coming in v2)</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger onMouseDown={(e) => e.preventDefault()} render={<Button variant="ghost" size="sm" />}>
+            Format
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().toggleBold().run()}
+            >
+              Bold
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().toggleItalic().run()}
+            >
+              Italic
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().toggleUnderline().run()}
+            >
+              Underline
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().toggleStrike().run()}
+            >
+              Strikethrough
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() =>
+                editor.chain().focus().setTextAlign("left").run()
+              }
+            >
+              Align left
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                editor.chain().focus().setTextAlign("center").run()
+              }
+            >
+              Align center
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                editor.chain().focus().setTextAlign("right").run()
+              }
+            >
+              Align right
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                editor.chain().focus().setTextAlign("justify").run()
+              }
+            >
+              Justify
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="ml-auto flex items-center gap-1">
+          {isOwner && (
+            <Button variant="outline" size="sm" onClick={onShareClick}>
+              <Share2 className="size-4" /> Share
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <RenameDialog
+        documentId={renameOpen ? documentId : null}
+        currentTitle={title}
+        onOpenChange={(open) => setRenameOpen(open)}
+      />
+    </>
+  );
+}

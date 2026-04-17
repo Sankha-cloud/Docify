@@ -39,3 +39,22 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code (per-developer local state — machine-specific permission list)
+.claude/settings.local.json
+
+# convex local dev state
+.convex/
+
+# turbopack / next cache variants
+.turbo/
+
+# editor / OS noise
+.vscode/
+.idea/
+Thumbs.db
+
+# logs
+*.log
+logs/
+

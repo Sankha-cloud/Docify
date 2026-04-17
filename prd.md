@@ -1,13 +1,46 @@
 # DocFlow — Product Requirements Document
-**Version:** 2.1 (Next.js 16 Updated)
+**Version:** 2.2 (implementation pass)
 **Author:** Sankha
-**Date:** April 14, 2026
-**Status:** ✅ Ready for AI-assisted Implementation
+**Date:** April 14, 2026 · last update 2026-04-17
+**Status:** 🟢 Core v1 implemented — pending production deploy and a few behavioral polish items
 
 > **How to use this PRD:**
 > Feed each Phase section to Cursor/Claude Code one at a time.
 > Each phase describes WHAT to build and WHY — not HOW.
 > The AI figures out the how. You verify the checkpoint before moving on.
+
+---
+
+## Implementation Status (2026-04-17)
+
+Legend: ✅ done · 🟡 partial / deviated · ⏸️ deferred to v1.1 · ❌ not applicable
+
+### Phases
+| # | Phase | Status | Notes |
+|---|---|---|---|
+| 1 | Project Scaffolding | ✅ | Tiptap v3, React Compiler + `cacheComponents` enabled, `proxy.ts` confirmed correct. |
+| 2 | Convex schema + all functions | ✅ | `documents`, `documentAccess`, `templates` tables + 12 queries/mutations. Access keyed by `email` (see 4.1). |
+| 3 | Auth pages | ✅ | `/sign-in`, `/sign-up` catch-all routes wrapped in Suspense for `cacheComponents`. |
+| 4 | Home Screen | ✅ | Navbar + template gallery + document list with filter/search/three-dot menu + rename + empty state. |
+| 5 | Document Editor (single-user) | ✅ | Auto-save 500ms, title sync to tab, File/Edit/Insert/Format menus, full toolbar, font-size via TextStyleKit `setFontSize`. |
+| 6 | Export (PDF, DOCX, MD, TXT) | ✅ | PDF via html2canvas+jsPDF; DOCX via docx.js walker; MD via custom Tiptap→Markdown serializer; TXT via `editor.getText()`. |
+| 7 | Real-Time Collaboration | ✅ | `/api/liveblocks-auth` verifies Convex access per request; `useLiveblocksExtension` drives Yjs + cursors; `AvatarStack` via `useOthers()`. |
+| 8 | Sharing & Access Enforcement | ✅ | Share dialog (invite/role/remove/copy-link). Three-layer enforcement: `documents.getById` → editor `isEditable` → Liveblocks auth token scope (`FULL_ACCESS` vs `READ_ACCESS`). |
+| 9 | Polish | 🟡 | Skeletons, error boundary, toasts, responsive warning banner done. Vercel production deploy + `npx convex deploy` not done yet. |
+
+### Deviations from the original spec
+- **Tiptap v3**, not v2 (current stable release; adapter APIs differ slightly — StarterKit now includes `Link` + `Underline`, history renamed to `undoRedo`, `FontSize` lives in `@tiptap/extension-text-style`).
+- **`@tiptap/extension-collaboration-cursor` was dropped.** Liveblocks' `@liveblocks/react-tiptap` extension handles cursors/presence labels itself; pulling in the separate cursor extension caused a v2/v3 peer conflict during install.
+- **Markdown export** uses a hand-rolled Tiptap JSON → Markdown walker in `lib/export.ts`. The `@tiptap/extension-markdown` package referenced in Phase 1 does not exist in v3.
+- **Liveblocks auth** moved to `convex/react-clerk` + `ConvexHttpClient` at the edge — see `app/api/liveblocks-auth/route.ts`.
+- **`cacheComponents: true` + React Compiler** enabled in `next.config.ts`. Pages that use `auth()` are wrapped in `<Suspense>` to satisfy the Cache Components constraint that runtime data must live under a Suspense boundary.
+
+### Deferred to v1.1 (tracked, not blocking)
+- ⏸️ **Find & Replace** floating panel (Section 8.4). Browser `Ctrl+F` still works.
+- ⏸️ **Email delivery** on invite (Section 10 already lists this as a Non-Goal; called out for clarity).
+- ⏸️ **Production deploy** to Vercel + `npx convex deploy` (Phase 9, last two bullets).
+- ⏸️ **Yjs "already imported" console warning** in dev — cosmetic, tracked at https://github.com/yjs/yjs/issues/438; does not affect behavior.
+- ⏸️ **Comments, version history, folders, offline mode, chart insertion** — all per Section 10.
 
 ---
 
@@ -47,7 +80,7 @@ A full-page rich text editor where users write content. The editor has a menu ba
 | Clerk | Authentication | Handles sign up/in, gives us userId, user profile, avatar |
 | Convex | Database | Reactive queries — UI auto-updates when DB changes. No polling. |
 | Liveblocks | Real-time collab layer | CRDT-based conflict-free text sync + presence (cursors, avatars) |
-| Tiptap v2 | Rich text editor | Extensible, open-source, has official Liveblocks + Yjs extensions |
+| Tiptap v3 | Rich text editor | Extensible, open-source, has official Liveblocks + Yjs extensions. (Originally specced as v2; v3 is the current stable and is what ships.) |
 | Yjs | CRDT engine (under Liveblocks) | The actual algorithm that merges simultaneous edits without conflicts |
 | shadcn/ui + Tailwind | UI | Consistent, accessible components |
 | jsPDF + html2canvas | PDF export | Render the editor HTML to a canvas then to PDF, client-side |
@@ -605,7 +638,7 @@ Verify the checkpoint before starting the next phase.
 
 ---
 
-### Phase 1 — Project Scaffolding
+### Phase 1 — Project Scaffolding — ✅ done
 **What to build:** Initialize the Next.js 16 project with all dependencies, providers, and environment configuration wired up.
 
 **Tell Cursor:**
@@ -623,7 +656,7 @@ Verify the checkpoint before starting the next phase.
 
 ---
 
-### Phase 2 — Database Schema & All Convex Functions
+### Phase 2 — Database Schema & All Convex Functions — ✅ done
 **What to build:** All 3 Convex tables and every query/mutation the app will ever need.
 
 **Tell Cursor:**
@@ -638,7 +671,7 @@ Verify the checkpoint before starting the next phase.
 
 ---
 
-### Phase 3 — Authentication
+### Phase 3 — Authentication — ✅ done
 **What to build:** Sign in and sign up pages with Clerk.
 
 **Tell Cursor:**
@@ -651,7 +684,7 @@ Verify the checkpoint before starting the next phase.
 
 ---
 
-### Phase 4 — Home Screen
+### Phase 4 — Home Screen — ✅ done
 **What to build:** The home dashboard.
 
 **Tell Cursor:**
@@ -668,8 +701,9 @@ Verify the checkpoint before starting the next phase.
 
 ---
 
-### Phase 5 — Document Editor (Single User)
+### Phase 5 — Document Editor (Single User) — ✅ done
 **What to build:** The full editor page without real-time collab.
+**Note:** Find & Replace floating panel is deferred to v1.1; native browser Ctrl+F is usable in the meantime.
 
 **Tell Cursor:**
 - Refer to Sections 8.2–8.7 for all behavioral rules
@@ -686,8 +720,9 @@ Verify the checkpoint before starting the next phase.
 
 ---
 
-### Phase 6 — Document Export
+### Phase 6 — Document Export — ✅ done
 **What to build:** All 4 export formats wired to the File → Download submenu.
+**Note:** Markdown uses a custom Tiptap JSON → MD walker in `lib/export.ts` — `@tiptap/extension-markdown` does not exist in v3.
 
 **Tell Cursor:**
 - Refer to Section 5.7 for the logic of each export format
@@ -702,8 +737,9 @@ Verify the checkpoint before starting the next phase.
 
 ---
 
-### Phase 7 — Real-Time Collaboration
+### Phase 7 — Real-Time Collaboration — ✅ done
 **What to build:** Liveblocks integration for multiplayer editing and presence.
+**Note:** Cursors are handled by `@liveblocks/react-tiptap`'s built-in caret/presence layer. The separate `@tiptap/extension-collaboration-cursor` package is not used (v2/v3 peer conflict; Liveblocks already covers it).
 
 **Tell Cursor:**
 - Refer to Section 7 (Real-Time Collaboration Architecture) of this PRD
@@ -723,7 +759,7 @@ Verify the checkpoint before starting the next phase.
 
 ---
 
-### Phase 8 — Sharing & Access Enforcement
+### Phase 8 — Sharing & Access Enforcement — ✅ done
 **What to build:** The share dialog and full access control enforcement.
 
 **Tell Cursor:**
@@ -738,8 +774,9 @@ Verify the checkpoint before starting the next phase.
 
 ---
 
-### Phase 9 — Polish & Deployment
+### Phase 9 — Polish & Deployment — 🟡 partial
 **What to build:** Error states, loading states, toasts, and Vercel deploy.
+**Status:** Skeletons, error boundary, toasts, responsive desktop-warning banner, and config audit are done. Production deploy (Vercel + `npx convex deploy`) is the remaining work.
 
 **Tell Cursor:**
 - Loading skeletons for: home screen document list, editor content on first load

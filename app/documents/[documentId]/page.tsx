@@ -2,15 +2,25 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
-import { HomeContent } from "./_components/home-content";
+import { EditorShell } from "./_components/editor-shell";
+import { Id } from "@/convex/_generated/dataModel";
 
-async function HomeGate() {
+async function DocumentGate({
+  params,
+}: {
+  params: Promise<{ documentId: string }>;
+}) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
-  return <HomeContent />;
+  const { documentId } = await params;
+  return <EditorShell documentId={documentId as Id<"documents">} />;
 }
 
-export default function Home() {
+export default function DocumentPage({
+  params,
+}: {
+  params: Promise<{ documentId: string }>;
+}) {
   return (
     <Suspense
       fallback={
@@ -19,7 +29,7 @@ export default function Home() {
         </main>
       }
     >
-      <HomeGate />
+      <DocumentGate params={params} />
     </Suspense>
   );
 }
