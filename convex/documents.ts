@@ -89,7 +89,12 @@ export const listByUser = query({
     ),
   },
   handler: async (ctx, args) => {
-    const identity = await requireIdentity(ctx);
+    // Return empty instead of throwing when unauthenticated. The client
+    // keeps this query subscribed for a beat during sign-out while Clerk
+    // tears down the session; throwing there would bubble up as a React
+    // error-overlay crash. No user → no results is the natural contract.
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
     const uid = identity.tokenIdentifier;
 
     const owned: Doc<"documents">[] =

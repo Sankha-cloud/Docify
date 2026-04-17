@@ -43,7 +43,16 @@ export async function getDocumentForRead(
   if (isOwner) return { doc, isOwner: true, role: null };
 
   const email = normalizeEmail(identity.email);
-  if (!email) throw new Error("Access denied");
+  // Non-owner access is keyed by email — if the JWT doesn't carry one, we
+  // can't match the invite. Clerk's default "convex" JWT template omits
+  // email unless the app adds `"email": "{{user.primary_email_address}}"`
+  // to the template. Surface this clearly instead of returning a generic
+  // "Access denied".
+  if (!email) {
+    throw new Error(
+      "Access denied: no email on identity (check Clerk 'convex' JWT template includes email claim)",
+    );
+  }
   const access = await getAccessEntryByEmail(ctx, documentId, email);
   if (!access) throw new Error("Access denied");
   return { doc, isOwner: false, role: access.role };

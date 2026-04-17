@@ -4,7 +4,6 @@ import {
   getAccessEntryByEmail,
   getDocumentForRead,
   normalizeEmail,
-  requireIdentity,
   requireOwner,
 } from "./helpers";
 
@@ -79,7 +78,11 @@ export const remove = mutation({
 export const getForUser = query({
   args: { documentId: v.id("documents") },
   handler: async (ctx, args) => {
-    const identity = await requireIdentity(ctx);
+    // Return null on unauthenticated rather than throwing — this query
+    // stays subscribed for a moment during sign-out and a thrown error
+    // would surface as a React runtime overlay.
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
     const email = normalizeEmail(identity.email);
     if (!email) return null;
     return await getAccessEntryByEmail(ctx, args.documentId, email);

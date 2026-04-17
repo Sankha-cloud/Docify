@@ -23,6 +23,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { ChevronDown, Copy, X } from "lucide-react";
+import { getErrorMessage } from "@/lib/errors";
 
 type Props = {
   documentId: Id<"documents"> | null;
@@ -55,7 +56,7 @@ export function ShareDialog({ documentId, onOpenChange }: Props) {
       toast.success(`Invited ${trimmed}`);
       setEmail("");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Invite failed");
+      toast.error(getErrorMessage(error, "Invite failed"));
     } finally {
       setSending(false);
     }

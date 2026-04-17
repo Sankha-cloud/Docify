@@ -8,12 +8,14 @@ A real-time collaborative rich-text editor — a mini Google Docs clone built wi
 
 - **Real-time collaboration** — multiplayer editing with Yjs CRDT via Liveblocks; presence cursors with user name labels and an avatar stack
 - **Rich-text editing** — Tiptap v3 with bold/italic/underline/strikethrough, headings, lists, blockquotes, code blocks, tables, images, links, text alignment, highlights, and font sizing
-- **Google-Docs-style page layout** — A4 pages (794 × 1123 px), 1-inch margins, simulated page breaks with thin dividers, and a floating `Page X of Y` indicator that tracks scroll position
-- **Auto-save** — 500 ms debounced persistence to Convex with a `Saving… / Saved ✓` badge
+- **Google-Docs-style page layout** — A4 pages (794 × 1123 px), 1-inch margins, simulated page breaks with thin dividers, a floating `Page X of Y` indicator, and a soft shadow that makes each page visibly float on the desktop
+- **Dark / light / system theme** — `next-themes` driven toggle; document pages keep a fixed light palette (scoped via CSS custom property overrides) so content and exports stay readable and consistent across modes
+- **Auto-save** — 500 ms debounced persistence to Convex with a `Saving… / Saved ✓` badge, with save-failure toasts surfacing the real server error
 - **Document sharing** — invite by email, per-user Editor / Viewer roles, copy link, and full access enforcement at three layers (Convex query, editor UI, Liveblocks auth)
-- **Export** — PDF, DOCX, Markdown, and plain text, all client-side
-- **Home dashboard** — template gallery, recent-documents list with ownership filter, client-side search, rename, duplicate, and soft-delete
-- **Auth** — Clerk sign-in / sign-up with email + Google OAuth
+- **Export** — PDF (via `html2canvas-pro`, which natively parses modern `oklch`/`lab`/`color()` CSS functions), DOCX with full image/table/nested-list/hardBreak fidelity, Markdown, and plain text — all client-side, lazy-loaded on use
+- **Rich template gallery** — each template card renders a miniature preview of its actual content instead of a generic icon
+- **Home dashboard** — recent-documents list with ownership filter, client-side search, rename, duplicate, and soft-delete
+- **Auth** — Clerk sign-in / sign-up with email + Google OAuth; protected routes via middleware with auto-redirect on sign-out
 
 ---
 
@@ -22,12 +24,12 @@ A real-time collaborative rich-text editor — a mini Google Docs clone built wi
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 16.2 (App Router, React Compiler, Turbopack) |
-| UI | React 19.2, Tailwind v4, shadcn/ui (base-nova style over `@base-ui/react`) |
-| Editor | Tiptap v3 + `@liveblocks/react-tiptap` |
+| UI | React 19.2, Tailwind v4, shadcn/ui (base-nova style over `@base-ui/react`), `next-themes` for dark mode |
+| Editor | Tiptap v3 + `@liveblocks/react-tiptap` (wired via the global `LiveblocksProvider`) |
 | Backend | Convex (reactive DB + functions) |
 | Real-time | Liveblocks + Yjs |
-| Auth | Clerk |
-| Export | jsPDF + html2canvas, docx.js |
+| Auth | Clerk (v7) with `clerkMiddleware` route protection |
+| Export | jsPDF + `html2canvas-pro`, `docx` |
 
 See [`prd.md`](./prd.md) for full architecture notes.
 
@@ -111,30 +113,40 @@ Open http://localhost:3000. You'll be redirected to `/sign-in`.
 ```
 app/
   (auth)/                       # /sign-in and /sign-up catch-all routes
-  _components/                  # shared home-screen dialogs (share, rename)
+  _components/                  # home-screen components + shared dialogs
+    navbar.tsx                  # top bar with search + theme toggle + user button
+    template-gallery.tsx        # cards with real per-template content previews
+    document-list.tsx           # recent-documents table (auth-gated query)
+    share-dialog.tsx, rename-dialog.tsx, document-menu.tsx, home-content.tsx
+  _lib/liveblocks.ts            # global type augmentation for Liveblocks v3 hooks
   api/liveblocks-auth/          # Liveblocks auth endpoint (re-checks Convex access)
   documents/[documentId]/
     _components/
-      editor-shell.tsx          # access gate + Liveblocks Room wrapper
-      editor-ui.tsx              # header, menu bar, toolbar, Tiptap mount
-      editor-styles.css          # A4 page + collaborative-cursor styles
-      menu-bar.tsx               # File / Edit / Insert / Format dropdowns
-      toolbar.tsx                # formatting toolbar + zoom
-      link-popover.tsx           # Google-Docs-style link editor (shared by toolbar + menu)
-      page-indicator.tsx         # "Page X of Y" floating pill
-      document-title.tsx         # inline editable title
-      avatar-stack.tsx           # presence via useOthers()
-      desktop-warning.tsx        # < 768px banner
-      room.tsx                   # RoomProvider
-      save-status.tsx            # Saving… / Saved ✓ badge
+      editor-shell.tsx          # access gate (silently redirects on trash/unshare)
+      editor-ui.tsx             # header, menu bar, toolbar, Tiptap mount, reactive editable
+      editor-styles.css         # A4 page + light-palette scope + dark-mode shadow
+      menu-bar.tsx              # File / Edit / Insert / Format dropdowns
+      toolbar.tsx               # formatting toolbar + zoom
+      link-popover.tsx          # Google-Docs-style link editor (shared)
+      page-indicator.tsx        # "Page X of Y" floating pill
+      document-title.tsx, avatar-stack.tsx, desktop-warning.tsx, room.tsx, save-status.tsx
     page.tsx
-  page.tsx                       # home dashboard
-components/ui/                   # shadcn base-nova primitives
+  page.tsx                      # home dashboard (server auth gate)
+  providers.tsx                 # ClerkProvider (+ afterSignOutUrl) + Convex + ThemeProvider
+  layout.tsx                    # suppressHydrationWarning for next-themes
+components/
+  ui/                           # shadcn base-nova primitives
+  theme-provider.tsx            # next-themes wrapper
+  mode-toggle.tsx               # Sun/Moon dropdown (Light / Dark / System)
 convex/
-  schema.ts                      # documents, documentAccess, templates
-  documents.ts, access.ts, templates.ts   # queries + mutations
-lib/export.ts                    # PDF / DOCX / MD / TXT exporters
-proxy.ts                         # Next.js 16 route protection (replaces middleware.ts)
+  schema.ts                     # documents, documentAccess, templates
+  documents.ts, access.ts, templates.ts, helpers.ts  # queries + mutations
+lib/
+  export/                       # per-format exporters (common, text, markdown, pdf, docx, types, index)
+  errors.ts                     # shared getErrorMessage helper
+  image-upload.ts               # shared pickAndInsertImage (menu-bar + toolbar)
+  utils.ts                      # cn()
+proxy.ts                        # Next.js 16 middleware — clerkMiddleware + auth.protect() gating
 ```
 
 ---

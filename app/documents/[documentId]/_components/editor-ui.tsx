@@ -29,6 +29,9 @@ import { AvatarStack } from "./avatar-stack";
 import { DesktopWarning } from "./desktop-warning";
 import { ShareDialog } from "@/app/_components/share-dialog";
 import { PageIndicator } from "./page-indicator";
+import { ModeToggle } from "@/components/mode-toggle";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 type Props = {
   documentId: Id<"documents">;
@@ -98,12 +101,22 @@ export function EditorUI({ documentId, doc, isOwner, isEditable }: Props) {
             content: JSON.stringify(editor.getJSON()),
           });
           setStatus("saved");
-        } catch {
+        } catch (error) {
+          console.error("[editor] save failed:", error);
+          toast.error(getErrorMessage(error, "Save failed"));
           setStatus("error");
         }
       }, SAVE_DEBOUNCE_MS);
     },
   });
+
+  // Keep Tiptap's editable flag in sync with server-granted permission.
+  // Without this, upgrading a viewer to editor mid-session (or downgrading)
+  // leaves the editor stuck at whatever value was captured at mount.
+  useEffect(() => {
+    if (!editor) return;
+    if (editor.isEditable !== isEditable) editor.setEditable(isEditable);
+  }, [editor, isEditable]);
 
   useEffect(() => {
     return () => {
@@ -135,6 +148,7 @@ export function EditorUI({ documentId, doc, isOwner, isEditable }: Props) {
           <SaveStatusBadge status={isEditable ? status : "idle"} />
           <div className="ml-auto flex items-center gap-3">
             <AvatarStack />
+            <ModeToggle />
             <UserButton />
           </div>
         </div>
@@ -153,7 +167,8 @@ export function EditorUI({ documentId, doc, isOwner, isEditable }: Props) {
       </header>
 
       <main
-        className="flex-1 overflow-y-auto bg-[#eef1f5] py-8"
+        className="flex-1 overflow-y-auto py-8"
+        style={{ backgroundColor: "var(--editor-desktop)" }}
         data-tiptap-root
       >
         <div

@@ -2,7 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { EditorUI } from "./editor-ui";
@@ -15,10 +15,21 @@ type Props = { documentId: Id<"documents"> };
 export function EditorShell({ documentId }: Props) {
   const data = useQuery(api.documents.getById, { documentId });
   const router = useRouter();
+  // Distinguishes "never had access" from "access just revoked". The query
+  // returns null in both cases, but we only want the error toast when the
+  // doc was unreachable from the first load — trashing/unsharing flips data
+  // from a value to null and the calling action already handles navigation.
+  const everHadData = useRef(false);
 
   useEffect(() => {
+    if (data) {
+      everHadData.current = true;
+      return;
+    }
     if (data === null) {
-      toast.error("You do not have access to this document");
+      if (!everHadData.current) {
+        toast.error("You do not have access to this document");
+      }
       router.replace("/");
     }
   }, [data, router]);

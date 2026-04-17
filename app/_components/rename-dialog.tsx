@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 type Props = {
   documentId: Id<"documents"> | null;
@@ -41,7 +42,7 @@ export function RenameDialog({ documentId, currentTitle, onOpenChange }: Props) 
       toast.success("Renamed");
       onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to rename");
+      toast.error(getErrorMessage(error, "Failed to rename"));
     } finally {
       setSaving(false);
     }

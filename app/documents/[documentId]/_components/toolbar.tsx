@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useState, ComponentProps } from "react";
 import { LinkPopover } from "./link-popover";
+import { pickAndInsertImage } from "@/lib/image-upload";
 
 type Props = {
   editor: Editor;
@@ -124,22 +125,7 @@ export function Toolbar({ editor, zoom, onZoomChange }: Props) {
     editor.chain().setFontSize(`${clamped}px`).run();
   };
 
-  const addImage = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/jpeg,image/png,image/gif,image/webp";
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const src = reader.result as string;
-        editor.chain().focus().setImage({ src }).run();
-      };
-      reader.readAsDataURL(file);
-    };
-    input.click();
-  };
+  const addImage = () => pickAndInsertImage(editor);
 
   const activeHeading =
     HEADINGS.find((h) => h.level === (state?.headingLevel ?? 0)) ??

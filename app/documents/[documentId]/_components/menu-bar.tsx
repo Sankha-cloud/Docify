@@ -27,6 +27,8 @@ import {
   downloadDocx,
   downloadPdf,
 } from "@/lib/export";
+import { getErrorMessage } from "@/lib/errors";
+import { pickAndInsertImage } from "@/lib/image-upload";
 
 type Props = {
   editor: Editor;
@@ -73,7 +75,7 @@ export function MenuBar({
       toast.success("Moved to trash");
       router.push("/");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Delete failed");
+      toast.error(getErrorMessage(error, "Delete failed"));
     }
   };
 
@@ -203,24 +205,7 @@ export function MenuBar({
               Insert
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              <DropdownMenuItem
-                onSelect={() => {
-                  const input = document.createElement("input");
-                  input.type = "file";
-                  input.accept = "image/jpeg,image/png,image/gif,image/webp";
-                  input.onchange = () => {
-                    const file = input.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      const src = reader.result as string;
-                      editor.chain().focus().setImage({ src }).run();
-                    };
-                    reader.readAsDataURL(file);
-                  };
-                  input.click();
-                }}
-              >
+              <DropdownMenuItem onSelect={() => pickAndInsertImage(editor)}>
                 Image
               </DropdownMenuItem>
               <DropdownMenuItem

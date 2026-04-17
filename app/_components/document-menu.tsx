@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { MoreVertical, Pencil, Trash2, Download, Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 type Props = {
   documentId: Id<"documents">;
@@ -29,7 +30,7 @@ export function DocumentMenu({ documentId, isOwner, onRename, onShare }: Props) 
       await softDelete({ documentId });
       toast.success("Moved to trash");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete");
+      toast.error(getErrorMessage(error, "Failed to delete"));
     }
   };
 

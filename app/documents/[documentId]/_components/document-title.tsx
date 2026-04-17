@@ -5,6 +5,7 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 type Props = {
   documentId: Id<"documents">;
@@ -36,7 +37,7 @@ export function DocumentTitle({ documentId, title, editable }: Props) {
       await updateTitle({ documentId, title: next });
       setValue(next);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Rename failed");
+      toast.error(getErrorMessage(error, "Rename failed"));
       setValue(title);
     }
   };

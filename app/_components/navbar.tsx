@@ -4,6 +4,7 @@ import { UserButton } from "@clerk/nextjs";
 import { Input } from "@/components/ui/input";
 import { FileText, Search } from "lucide-react";
 import Link from "next/link";
+import { ModeToggle } from "@/components/mode-toggle";
 
 type Props = {
   search: string;
@@ -31,6 +32,7 @@ export function Navbar({ search, onSearchChange }: Props) {
             aria-label="Search documents"
           />
         </div>
+        <ModeToggle />
         <UserButton />
       </div>
     </header>

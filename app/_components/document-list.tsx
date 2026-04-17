@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
@@ -43,7 +43,15 @@ type Props = { search: string };
 
 export function DocumentList({ search }: Props) {
   const [filter, setFilter] = useState<FilterType>("anyone");
-  const documents = useQuery(api.documents.listByUser, { filterType: filter });
+  // Skip the query the moment Clerk/Convex report the session is gone.
+  // Without this gate, the subscription stays live through sign-out and
+  // Convex throws "Not authenticated" before React can unmount, which
+  // surfaces as a dev runtime overlay.
+  const { isAuthenticated } = useConvexAuth();
+  const documents = useQuery(
+    api.documents.listByUser,
+    isAuthenticated ? { filterType: filter } : "skip",
+  );
   const { user } = useUser();
   const router = useRouter();
   const ownerTokenIdentifier = useMemo(() => {

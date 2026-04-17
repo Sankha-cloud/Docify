@@ -1,8 +1,8 @@
 # DocFlow — Product Requirements Document
-**Version:** 2.3 (polish pass)
+**Version:** 2.4 (dark mode + correctness pass)
 **Author:** Sankha
-**Date:** April 14, 2026 · last update 2026-04-17
-**Status:** 🟢 Core v1 implemented + UX polish pass complete — pending production deploy
+**Date:** April 14, 2026 · last update 2026-04-18
+**Status:** 🟢 Core v1 + UX polish + correctness & a11y pass complete — pending production deploy
 
 > **How to use this PRD:**
 > Feed each Phase section to Cursor/Claude Code one at a time.
@@ -11,7 +11,7 @@
 
 ---
 
-## Implementation Status (2026-04-17)
+## Implementation Status (2026-04-18)
 
 Legend: ✅ done · 🟡 partial / deviated · ⏸️ deferred to v1.1 · ❌ not applicable
 
@@ -40,6 +40,27 @@ Completed in a single session against the live app:
 - **Google-Docs-style link popover** — new `link-popover.tsx` with display-text + URL inputs, existing-URL preview with Remove, and an Apply button. Reused by both the toolbar link button and the Insert → Link menu item; the menu item version renders a hidden `sr-only` anchor and is driven programmatically. Link application uses `setTextSelection(sel).insertContent({…marks:[{type:"link"}]})` — the naïve `deleteRange + insertContentAt` threw ProseMirror's `TransformError: Inserted content deeper than insertion position` when the deletion landed on a block boundary.
 - **PDF export — `oklch` / `lab` colour-function shim** — html2canvas can't parse modern CSS colour functions, which Tailwind v4's theme variables (and Liveblocks' selection CSS) use heavily. `lib/export.ts` now: (1) walks every `cssRule.cssText` to collect every unique `oklch|oklab|lab|lch(...)` string, (2) resolves each to `rgb()` via a hidden probe element + `getComputedStyle`, (3) in html2canvas's `onclone`, replaces those literal strings inside every `<style>` element. Earlier attempt only patched `--` custom properties and missed direct-value usage.
 - **Liveblocks cursor styling** — imported `@liveblocks/react-tiptap/styles.css` (previously missing; the default look was a solid blue selection block). Added Google-Docs-style caret + floating name label with a fade-out animation and a 0.35-opacity selection override in `editor-styles.css`.
+
+### Correctness & A11y Pass (2026-04-18)
+
+A second polish session focused on real bugs surfaced in day-to-day use, plus dark mode:
+
+- **PDF export — swapped `html2canvas` → `html2canvas-pro`.** The earlier `oklch`/`lab` shim worked against author-stylesheet rules but was defeated by `!important` upstream, `::before`/`::after` pseudos (Next.js dev toolbar, Clerk overlays), and elements whose computed colour preserved its original colour-space (modern Chrome). Rather than keep fighting the v1.4 parser, we switched to the maintained fork which natively parses `oklch`/`oklab`/`lab`/`lch`/`color()`. Removed the ~200-line scrub code from `lib/export/pdf.ts`; legacy `html2canvas` uninstalled.
+- **DOCX export rewrite** — images (`ImageRun` with byte-signature PNG/JPG/GIF/BMP detection and pre-fetch), tables (`Table`/`TableRow`/`TableCell` with borders), `hardBreak` (soft line breaks), `horizontalRule`, nested lists with correct indentation, multi-block list items as continuation paragraphs, `textStyle` colour + `highlight` marks, headings 1–6. Previously all of these were either dropped or flattened into a single paragraph.
+- **Real-time collaboration — the actual fix.** Setup used the legacy `createRoomContext(createClient(...))` from `app/_lib/liveblocks.ts`. `@liveblocks/react-tiptap`'s `useLiveblocksExtension` reads from the **global** `@liveblocks/react` context installed by `<LiveblocksProvider>`, so with the scoped pattern it never joined the room — edits stayed local and only the 500 ms Convex snapshot persisted. `room.tsx` now uses the official `<LiveblocksProvider authEndpoint=…> → <RoomProvider id=…>`. `app/_lib/liveblocks.ts` repurposed as the global type-augmentation file (`declare global { interface Liveblocks { UserMeta: { … } } }`). `avatar-stack.tsx` imports `useOthers`/`useSelf` directly from `@liveblocks/react`.
+- **Module split: `lib/export.ts` → `lib/export/`** — 551 LOC monolith broken into `common.ts` (`sanitizeFilename`, `downloadBlob`), `types.ts` (`TiptapNode`, `TiptapMark`), `text.ts`, `markdown.ts`, `pdf.ts`, `docx.ts`, and an `index.ts` barrel. Heavy deps (`jspdf`, `docx`, `html2canvas-pro`) stay `await import()`'d inside each function, so format modules load lazily on use.
+- **Shared `getErrorMessage(error, fallback)`** in `lib/errors.ts` — replaces 8 inline `error instanceof Error ? error.message : "..."` occurrences across mutations, export functions, and the editor save path.
+- **Shared `pickAndInsertImage(editor)`** in `lib/image-upload.ts` — replaces a byte-identical 16-line block duplicated in `toolbar.tsx` and `menu-bar.tsx`.
+- **Dark / light / system theme** — `next-themes` wired via `<ClerkProvider> → <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>` in `providers.tsx`. `<html suppressHydrationWarning>` on `layout.tsx`. `components/mode-toggle.tsx` is the shadcn Sun/Moon dropdown (Light / Dark / System), placed in the home navbar and the editor header.
+- **Theme-aware editor chrome** — added four editor-specific CSS variables (`--editor-desktop`, `--editor-page`, `--editor-page-edge`, `--editor-page-text`) to both `:root` and `.dark` in `globals.css`. `editor-styles.css` consumes them via `var(…)` — the desktop behind pages flips to a dark gray while the page itself stays white (matches Google Docs; keeps exports identical across themes). Added a soft `box-shadow` so the page floats on the desktop (stronger shadow in dark mode for clearer elevation).
+- **Scoped light-palette inside `.docflow-page`** — the page surface is always white, but Tiptap's inner styles reference `var(--border)`, `var(--muted)`, `var(--muted-foreground)`, etc. In dark mode those tokens flipped to dark values, turning table borders invisible on the white page and making code blocks dark-on-white. Redeclared the light-mode shadcn tokens inside `.docflow-page` so everything inside the page — table rules, blockquote borders, code-chip backgrounds, `<hr>` — stays readable regardless of the app's global theme.
+- **Template gallery — real content previews.** Each card now parses its template's Tiptap JSON and renders the first ~8 nodes as a scaled-down preview (H1/H2/H3 in weighted text, paragraphs as muted lines). Previously every card looked identical (generic `FileText` icon + name). Blank template renders a sparse skeleton. Also fixed the stuck-loader bug: previously `disabled={pendingId !== null}` disabled every card when any one was pending, and `pendingId` persisted across App Router's client-side back-navigation cache; now only the in-flight card is disabled and `pendingId` resets on remount and in `finally`.
+- **Editor `editable` now reacts to permission changes.** `useEditor` only reads `editable` at mount — so a viewer upgraded to editor mid-session stayed read-only. Added a `useEffect` that calls `editor.setEditable(isEditable)` when the flag changes. Save failures (`updateContent`) now log the real error and surface it as a toast instead of being swallowed by an empty `catch {}`.
+- **Spurious "You do not have access to this document" toast on trash.** `editor-shell.tsx` showed the error whenever the `getById` query went from value → `null`, which includes the owner's own trash action. Added an `everHadData` ref: the toast only fires when the doc was unreachable from the first load, otherwise the shell silently redirects to `/`.
+- **Convex queries return empty/null on no identity, rather than throwing.** `documents.listByUser` and `access.getForUser` were calling `requireIdentity(ctx)` which threw during the brief sign-out window where the Clerk session is gone but the Convex subscription is still live — surfaced as a dev runtime overlay. Mutations still throw (explicit user actions). Paired with a client-side `useConvexAuth()` gate in `document-list.tsx` that passes `"skip"` when `!isAuthenticated`, eliminating the race at the subscription level.
+- **Middleware route protection.** `proxy.ts` now passes a callback: `clerkMiddleware(async (auth, req) => { if (!isPublicRoute(req)) await auth.protect(); })` with a `createRouteMatcher` for `/sign-in`, `/sign-up`, and `/api/liveblocks-auth` (which checks auth internally and must return JSON, not a redirect). The bare `clerkMiddleware()` was permissive — after sign-out the URL stayed on `/` and only a manual refresh triggered `HomeGate`'s server-side redirect.
+- **`afterSignOutUrl="/sign-in"` on `<ClerkProvider>`.** Clerk v7 removed this prop from `<UserButton>` and moved it to the provider; setting it there makes sign-out from any `UserButton` in the app navigate instantly instead of staying on the now-unauthenticated page.
+- **Clearer auth-failure error for non-owners** — `getDocumentForRead` in `convex/helpers.ts` now throws `"Access denied: no email on identity (check Clerk 'convex' JWT template includes email claim)"` instead of the generic `"Access denied"`. The #1 latent cause of invited-user edit failures is Clerk's default `convex` JWT template omitting `"email": "{{user.primary_email_address}}"`; the diagnostic makes it self-explaining.
 
 ### Deviations from the original spec
 - **Tiptap v3**, not v2 (current stable release; adapter APIs differ slightly — StarterKit now includes `Link` + `Underline`, history renamed to `undoRedo`, `FontSize` lives in `@tiptap/extension-text-style`).
@@ -737,7 +758,7 @@ Verify the checkpoint before starting the next phase.
 
 ### Phase 6 — Document Export — ✅ done
 **What to build:** All 4 export formats wired to the File → Download submenu.
-**Note:** Markdown uses a custom Tiptap JSON → MD walker in `lib/export.ts` — `@tiptap/extension-markdown` does not exist in v3.
+**Note:** Markdown uses a custom Tiptap JSON → MD walker in `lib/export/markdown.ts` (split module) — `@tiptap/extension-markdown` does not exist in v3.
 
 **Tell Cursor:**
 - Refer to Section 5.7 for the logic of each export format

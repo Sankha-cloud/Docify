@@ -1,6 +1,6 @@
 "use client";
 
-import { useOthers, useSelf } from "@/app/_lib/liveblocks";
+import { useOthers, useSelf } from "@liveblocks/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Tooltip,
